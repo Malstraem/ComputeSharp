@@ -25,6 +25,12 @@
     <Content Include="..\ComputeSharp.SwapChain\Textures\RustyMetal.png">
       <Link>Assets\Textures\RustyMetal.png</Link>
     </Content>
+    <Content Include="..\ComputeSharp.SwapChain\Textures\DayEarth.jpg">
+      <Link>Assets\Textures\DayEarth.jpg</Link>
+    </Content>
+    <Content Include="..\ComputeSharp.SwapChain\Textures\NightEarth.jpg">
+      <Link>Assets\Textures\NightEarth.jpg</Link>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

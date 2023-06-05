@@ -22,5 +22,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)PyramidPattern.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TriangleGridContouring.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TwoTiledTruchet.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)AtmosphericScattering.cs" />
   </ItemGroup>
 </Project>

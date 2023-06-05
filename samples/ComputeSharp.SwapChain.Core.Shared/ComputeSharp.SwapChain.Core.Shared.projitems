@@ -18,8 +18,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\DebugAnalyticsService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\IAnalyticsService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Shaders\PixelShaderEffect.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shaders\Runners\D2D1AtmosphericScatteringRunner.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Shaders\Runners\D2D1ContouredLayersRunner.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Shaders\Runners\ContouredLayersRunner.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shaders\Runners\AtmosphericScatteringRunner.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ViewModels\MainViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ViewModels\ShaderRunnerViewModel.cs" />
   </ItemGroup>

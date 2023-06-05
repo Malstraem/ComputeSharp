@@ -129,6 +129,7 @@ public sealed partial class MainViewModel : ObservableObject
             nameof(TerracedHills),
             new ShaderRunner<TerracedHills>(static time => new((float)time.TotalSeconds)),
             new PixelShaderEffect.For<SwapChain.Shaders.D2D1.TerracedHills>(static (time, width, height) => new((float)time.TotalSeconds, new int2(width, height)))),
+        new(nameof(AtmosphericScattering), new AtmosphericScatteringRunner(), new D2D1AtmosphericScatteringEffect()),
     };
 
     /// <summary>
