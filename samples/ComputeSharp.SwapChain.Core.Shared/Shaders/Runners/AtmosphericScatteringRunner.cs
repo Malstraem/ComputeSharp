@@ -44,7 +44,10 @@ public sealed class AtmosphericScatteringRunner : IShaderRunner
             this.earthNightTexture = texture.GraphicsDevice.LoadReadOnlyTexture2D<Rgba32, Float4>(filename);
         }
 
-        texture.GraphicsDevice.ForEach(texture, new AtmosphericScattering(this.earth, this.earthDayTexture, this.earthNightTexture, (float)timespan.TotalSeconds));
+        texture.GraphicsDevice.ForEach(texture, new AtmosphericScattering((float)timespan.TotalSeconds,
+                                                                          this.earth,
+                                                                          this.earthDayTexture,
+                                                                          this.earthNightTexture));
 
         return true;
     }

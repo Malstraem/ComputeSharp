@@ -26,46 +26,50 @@ public sealed class D2D1AtmosphericScatteringEffect : PixelShaderEffect
 
     private Earth earth = Earth.New(new float4((float3)0, 1), 0.2f);
 
-    /// <inheritdoc/>
-    protected override unsafe void BuildEffectGraph(EffectGraph effectGraph)
+    private static unsafe D2D1ResourceTextureManager CreateTextureManager(string filename)
     {
-        string filename = Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Textures", "NightEarth.jpg");
+        ReadOnlyTexture2D<Rgba32, float4> readonlyTexture = GraphicsDevice.GetDefault().LoadReadOnlyTexture2D<Rgba32, float4>(filename);
+        ReadBackTexture2D<Rgba32> readbackTexture = GraphicsDevice.GetDefault().AllocateReadBackTexture2D<Rgba32>(readonlyTexture.Width, readonlyTexture.Height);
 
-        // As a temporary workaround for the lack of image decoding helpers for D2D1ResourceTextureManager, and in order to
-        // keep the code here synchronous and simple, we can just leverage the DirectX 12 APIs to load textures. That is, we
-        // first load a texture (which will use WIC behind the scenes) to get the decoded image data in GPU memory, and then
-        // copy the data in a readback texture we can read from on the CPU. We can't just load an upload texture and read
-        // from it, as that type of texture can only be written to from the CPU. From there, we create a D2D resource texture.
-        using ReadOnlyTexture2D<Rgba32, float4> readOnlyTexture = GraphicsDevice.GetDefault().LoadReadOnlyTexture2D<Rgba32, float4>(filename);
-        using ReadBackTexture2D<Rgba32> readBackTexture = GraphicsDevice.GetDefault().AllocateReadBackTexture2D<Rgba32>(readOnlyTexture.Width, readOnlyTexture.Height);
+        readonlyTexture.CopyTo(readbackTexture);
 
-        readOnlyTexture.CopyTo(readBackTexture);
+        Rgba32* dataBuffer = readbackTexture.View.DangerousGetAddressAndByteStride(out int strideInBytes);
+        int bufferSize = ((readbackTexture.Height - 1) * strideInBytes) + (readbackTexture.Width * sizeof(Rgba32));
 
-        // Get the buffer pointer, the stride, and calculate the buffer size without the trailing padding.
-        // That is, the area between the end of the data in the last row and the stride is not included.
-        Rgba32* dataBuffer = readBackTexture.View.DangerousGetAddressAndByteStride(out int strideInBytes);
-        int bufferSize = ((readBackTexture.Height - 1) * strideInBytes) + (readBackTexture.Width * sizeof(Rgba32));
-
-        // Create the resource texture manager to use in the shader
-        D2D1ResourceTextureManager resourceTextureManager = new(
-            extents: stackalloc uint[] { (uint)readBackTexture.Width, (uint)readBackTexture.Height },
+        return new(
+            extents: stackalloc uint[] { (uint)readbackTexture.Width, (uint)readbackTexture.Height },
             bufferPrecision: D2D1BufferPrecision.UInt8Normalized,
             channelDepth: D2D1ChannelDepth.Four,
             filter: D2D1Filter.MinMagMipLinear,
             extendModes: stackalloc D2D1ExtendMode[] { D2D1ExtendMode.Mirror, D2D1ExtendMode.Mirror },
             data: new ReadOnlySpan<byte>(dataBuffer, bufferSize),
             strides: stackalloc uint[] { (uint)strideInBytes });
+    }
 
-        // Create the new pixel shader effect
-        PixelShaderEffect<AtmosphericScattering> pixelShaderEffect = new() { ResourceTextureManagers = { [0] = resourceTextureManager } };
+    /// <inheritdoc/>
+    protected override unsafe void BuildEffectGraph(EffectGraph effectGraph)
+    {
+        D2D1ResourceTextureManager dayTextureManager = CreateTextureManager(Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Textures", "DayEarth.jpg"));
 
-        // Register the pixel shader effect as the output node in the effect graph
+        D2D1ResourceTextureManager nightTextureManager = CreateTextureManager(Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Textures", "NightEarth.jpg"));
+
+        PixelShaderEffect<AtmosphericScattering> pixelShaderEffect = new()
+        {
+            ResourceTextureManagers =
+            {
+                [0] = dayTextureManager,
+                [1] = nightTextureManager
+            }
+        };
+
         effectGraph.RegisterOutputNode(PixelShaderEffect, pixelShaderEffect);
     }
 
     /// <inheritdoc/>
     protected override void ConfigureEffectGraph(EffectGraph effectGraph)
     {
-        effectGraph.GetNode(PixelShaderEffect).ConstantBuffer = new AtmosphericScattering((float)ElapsedTime.TotalSeconds, new int2(ScreenWidth, ScreenHeight), this.earth);
+        effectGraph.GetNode(PixelShaderEffect).ConstantBuffer = new AtmosphericScattering((float)ElapsedTime.TotalSeconds,
+                                                                                           new int2(ScreenWidth, ScreenHeight),
+                                                                                           this.earth);
     }
 }

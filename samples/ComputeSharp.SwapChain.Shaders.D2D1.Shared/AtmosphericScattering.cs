@@ -23,9 +23,8 @@ public struct Earth
 }
 
 /// <summary>
-/// A shader creating an abstract and colorful animation.
-/// Ported from <see href="https://www.shadertoy.com/view/WtjyzR"/>.
-/// <para>Created by Benoit Marini.</para>
+/// Shader showing atmospheric scattering effect.
+/// Based on <see href="https://www.shadertoy.com/view/MldyDH"/>.
 /// <para>License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.</para>
 /// </summary>
 [D2DInputCount(0)]
@@ -68,10 +67,10 @@ internal readonly partial struct AtmosphericScattering : ID2D1PixelShader
 
     private readonly Earth earth;
 
-    /*[D2DResourceTextureIndex(0)]
-    private readonly D2D1ResourceTexture2D<float4> earthDayTexture;*/
-
     [D2DResourceTextureIndex(0)]
+    private readonly D2D1ResourceTexture2D<float4> earthDayTexture;
+
+    [D2DResourceTextureIndex(1)]
     private readonly D2D1ResourceTexture2D<float4> earthNightTexture;
 
     private static float2 GetSphereIntersects(Ray ray, float4 sphere)
@@ -249,10 +248,11 @@ internal readonly partial struct AtmosphericScattering : ID2D1PixelShader
             float longitude = Atan2(normal.X, normal.Z) * 180f / Pi;
             float2 uv = new float2(longitude / 360f, latitude / 180f) + 0.5f;
 
-            //float3 dayColor = this.earthDayTexture.Sample(uv).RGB;
+            float3 dayColor = this.earthDayTexture.Sample(uv).RGB;
             float3 nightColor = this.earthNightTexture.Sample(uv).RGB;
 
-            fragColor.RGB = nightColor;
+            fragColor.RGB = nightColor; // only for build
+            fragColor.RGB = dayColor;
         }
 
         fragColor.RGB += scatter;

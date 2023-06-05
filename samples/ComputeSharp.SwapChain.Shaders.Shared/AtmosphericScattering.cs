@@ -21,6 +21,11 @@ public struct Earth
     }
 }
 
+/// <summary>
+/// Shader showing atmospheric scattering effect.
+/// Based on <see href="https://www.shadertoy.com/view/MldyDH"/>.
+/// <para>License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.</para>
+/// </summary>
 [AutoConstructor]
 #if SAMPLE_APP
 [EmbeddedBytecode(DispatchAxis.XY)]
@@ -44,6 +49,11 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
         }
     };
 
+    /// <summary>
+    /// The current time since the start of the application.
+    /// </summary>
+    private readonly float time;
+
     private const float Pi = 3.14159265359f;
 
     private const int OutScatterCount = 8;
@@ -54,11 +64,6 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
     private readonly IReadOnlyNormalizedTexture2D<float4> earthDayTexture;
 
     private readonly IReadOnlyNormalizedTexture2D<float4> earthNightTexture;
-
-    /// <summary>
-    /// The current time since the start of the application.
-    /// </summary>
-    private readonly float time;
 
     private static float2 GetSphereIntersects(Ray ray, float4 sphere)
     {
@@ -77,7 +82,7 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
         return new float2(-b - d, -b + d);
     }
 
-    private static float3 RayDirection(float fov, float2 size, float2 position)
+    private static float3 GetRayDirection(float fov, float2 size, float2 position)
     {
         float2 xy = position - (size * 0.5f);
 
@@ -128,62 +133,51 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
         return sum;
     }
 
-    private float3 InScatter(float3 o, float3 dir, float2 e, float3 l)
+    private float3 InScatter(Ray ray, float2 intersects, float3 lightDirection)
     {
         const float phRay = 0.05f;
         const float phMie = 0.02f;
 
         float3 kRay = new(3.8f, 13.5f, 33.1f);
-        float3 k_mie = (float3)21f;
+        float3 kMie = (float3)21f;
 
-        float3 sum_ray = (float3)0f;
-        float3 sum_mie = (float3)0f;
+        float3 sumRay = default;
+        float3 sumMie = default;
 
-        float n_ray0 = 0f;
-        float n_mie0 = 0f;
+        float nRay0 = 0f;
+        float nMie0 = 0f;
 
-        float len = (e.Y - e.X) / InScatterCount;
-        float3 s = dir * len;
-        float3 v = o + (dir * (e.X + (len * 0.5f)));
+        float len = (intersects.Y - intersects.X) / InScatterCount;
+        float3 s = ray.Direction * len;
+        float3 v = ray.Origin + (ray.Direction * (intersects.X + (len * 0.5f)));
 
         for (int i = 0; i < InScatterCount; i++, v += s)
         {
-            float d_ray = Density(v, phRay) * len;
-            float d_mie = Density(v, phMie) * len;
+            float dRay = Density(v, phRay) * len;
+            float dMie = Density(v, phMie) * len;
 
-            n_ray0 += d_ray;
-            n_mie0 += d_mie;
+            nRay0 += dRay;
+            nMie0 += dMie;
 
-            Ray ray = Ray.New(v, l);
+            Ray stepRay = Ray.New(v, lightDirection);
 
-            if (i == 0)
-            {
-                e = GetSphereIntersects(ray, this.earth.Sphere);
-                e.X = Max(e.X, 0);
+            float2 stepIntersects = GetSphereIntersects(stepRay, this.earth.Atmosphere);
+            float3 u = v + (lightDirection * stepIntersects.Y);
 
-                if (e.X < e.Y)
-                {
-                    continue;
-                }
-            }
+            float nRay1 = Optic(v, u, phRay);
+            float nMie1 = Optic(v, u, phMie);
 
-            float2 f = GetSphereIntersects(ray, this.earth.Atmosphere);
-            float3 u = v + (l * f.Y);
+            float3 att = Exp((-(nRay0 + nRay1) * kRay) - ((nMie0 + nMie1) * kMie));
 
-            float n_ray1 = Optic(v, u, phRay);
-            float n_mie1 = Optic(v, u, phMie);
-
-            float3 att = Exp((-(n_ray0 + n_ray1) * kRay) - ((n_mie0 + n_mie1) * k_mie));
-
-            sum_ray += d_ray * att;
-            sum_mie += d_mie * att;
+            sumRay += dRay * att;
+            sumMie += dMie * att;
         }
 
-        float c = Dot(dir, -l);
+        float c = Dot(ray.Direction, -lightDirection);
 
         float cc = c * c;
 
-        float3 scatter = (sum_ray * kRay * RayPhase(cc)) + (sum_mie * k_mie * MiePhase(-0.78f, c, cc));
+        float3 scatter = (sumRay * kRay * RayPhase(cc)) + (sumMie * kMie * MiePhase(-0.78f, c, cc));
 
         return 10f * scatter;
     }
@@ -203,7 +197,7 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
     {
         float2 fragCoord = new(ThreadIds.X, DispatchSize.Y - ThreadIds.Y);
 
-        float3 direction = RayDirection(45f, DispatchSize.XY, fragCoord);
+        float3 direction = GetRayDirection(45f, DispatchSize.XY, fragCoord);
 
         float3 eye = new(0f, 0f, 3f);
 
@@ -221,7 +215,7 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
 
         atmosphereIntersects.Y = Min(atmosphereIntersects.Y, planetIntersects.X);
 
-        float3 scatter = InScatter(eye, direction, atmosphereIntersects, lightDirection);
+        float3 scatter = InScatter(ray, atmosphereIntersects, lightDirection);
 
         float4 fragColor = default;
 
