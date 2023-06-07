@@ -1,3 +1,5 @@
+using System;
+
 using static ComputeSharp.Hlsl;
 
 namespace ComputeSharp.SwapChain.Shaders;
@@ -49,21 +51,39 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
         }
     };
 
-    /// <summary>
-    /// The current time since the start of the application.
-    /// </summary>
     private readonly float time;
-
-    private const float Pi = 3.14159265359f;
-
-    private const int OutScatterCount = 8;
-    private const int InScatterCount = 80;
 
     private readonly Earth earth;
 
     private readonly IReadOnlyNormalizedTexture2D<float4> earthDayTexture;
-
     private readonly IReadOnlyNormalizedTexture2D<float4> earthNightTexture;
+
+    private const float Pi = (float)Math.PI;
+
+    private const int InScatterCount = 80;
+    private const int OutScatterCount = 8;
+
+    private const int SSAA = 8;
+
+    private static float3 GetRayDirection(float fov, float2 size, float2 position)
+    {
+        float2 xy = position - (size * 0.5f);
+
+        float halfFovCotangent = Tan(Radians(90f - (fov * 0.5f)));
+        float z = size.Y * 0.5f * halfFovCotangent;
+
+        return Normalize(new float3(xy, -z));
+    }
+
+    private static float3x3 GetRotation(float2 angle)
+    {
+        float2 cos = Cos(angle);
+        float2 sin = Sin(angle);
+
+        return new float3x3(cos.Y, 0f, -sin.Y,
+                            sin.Y * sin.X, cos.X, cos.Y * sin.X,
+                            sin.Y * cos.X, -sin.X, cos.Y * cos.X);
+    }
 
     private static float2 GetSphereIntersects(Ray ray, float4 sphere)
     {
@@ -82,34 +102,6 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
         return new float2(-b - d, -b + d);
     }
 
-    private static float3 GetRayDirection(float fov, float2 size, float2 position)
-    {
-        float2 xy = position - (size * 0.5f);
-
-        float halfFovCotangent = Tan(Radians(90f - (fov * 0.5f)));
-        float z = size.Y * 0.5f * halfFovCotangent;
-
-        return Normalize(new float3(xy, -z));
-    }
-
-    private static float MiePhase(float g, float c, float cc)
-    {
-        float gg = g * g;
-
-        float a = (1f - gg) * (1f + cc);
-
-        float b = 1f + gg - (2f * g * c);
-        b *= Sqrt(b);
-        b *= 2f + gg;
-
-        return 3f / 8f / Pi * a / b;
-    }
-
-    private static float RayPhase(float cc)
-    {
-        return 3f / 16f / Pi * (1f + cc);
-    }
-
     private float Density(float3 p, float ph)
     {
         return Exp(-Max(Length(p) - this.earth.Sphere.W, 0f) / ph / this.earth.AtmosphereThickness);
@@ -117,26 +109,38 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
 
     private float Optic(float3 p, float3 q, float ph)
     {
-        float3 s = (q - p) / OutScatterCount;
-        float3 v = p + (s * 0.5f);
-
         float sum = 0f;
+        float3 s = (q - p) / OutScatterCount, v = p + (s * 0.5f);
 
-        for (int i = 0; i < OutScatterCount; i++)
+        for (int i = 0; i < OutScatterCount; i++, v += s)
         {
             sum += Density(v, ph);
-            v += s;
         }
 
-        sum *= Length(s);
-
-        return sum;
+        return sum * Length(s);
     }
 
-    private float3 InScatter(Ray ray, float2 intersects, float3 lightDirection)
+    private float3 GetScattering(Ray ray, float2 intersects, float3 lightDirection)
     {
+        static float RayPhase(float cc)
+        {
+            return 3f / 16f / Pi * (1f + cc);
+        }
+
+        static float MiePhase(float g, float c, float cc)
+        {
+            float gg = g * g;
+            float a = (1f - gg) * (1f + cc);
+            float b = 1f + gg - (2f * g * c);
+
+            b *= Sqrt(b) * (2f + gg);
+
+            return 3f / 8f / Pi * a / b;
+        }
+
         const float phRay = 0.05f;
         const float phMie = 0.02f;
+        const float kMieEx = 1.1f;
 
         float3 kRay = new(3.8f, 13.5f, 33.1f);
         float3 kMie = (float3)21f;
@@ -148,6 +152,7 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
         float nMie0 = 0f;
 
         float len = (intersects.Y - intersects.X) / InScatterCount;
+
         float3 s = ray.Direction * len;
         float3 v = ray.Origin + (ray.Direction * (intersects.X + (len * 0.5f)));
 
@@ -167,29 +172,18 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
             float nRay1 = Optic(v, u, phRay);
             float nMie1 = Optic(v, u, phMie);
 
-            float3 att = Exp((-(nRay0 + nRay1) * kRay) - ((nMie0 + nMie1) * kMie));
+            float3 attenuate = Exp((-(nRay0 + nRay1) * kRay) - ((nMie0 + nMie1) * kMie * kMieEx));
 
-            sumRay += dRay * att;
-            sumMie += dMie * att;
+            sumRay += dRay * attenuate;
+            sumMie += dMie * attenuate;
         }
 
         float c = Dot(ray.Direction, -lightDirection);
-
         float cc = c * c;
 
         float3 scatter = (sumRay * kRay * RayPhase(cc)) + (sumMie * kMie * MiePhase(-0.78f, c, cc));
 
-        return 10f * scatter;
-    }
-
-    private static float3x3 Rotate(float2 angle)
-    {
-        float2 cos = Cos(angle);
-        float2 sin = Sin(angle);
-
-        return new float3x3(cos.Y, 0f, -sin.Y,
-                            sin.Y * sin.X, cos.X, cos.Y * sin.X,
-                            sin.Y * cos.X, -sin.X, cos.Y * cos.X);
+        return 15f * scatter;
     }
 
     /// <inheritdoc/>
@@ -197,45 +191,57 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
     {
         float2 fragCoord = new(ThreadIds.X, DispatchSize.Y - ThreadIds.Y);
 
-        float3 direction = GetRayDirection(45f, DispatchSize.XY, fragCoord);
-
         float3 eye = new(0f, 0f, 3f);
-
-        float3x3 rotation = Rotate(new float2(0f, this.time * 0.2f));
-
-        direction = rotation * direction;
-        eye = rotation * eye;
-
         float3 lightDirection = new(0f, 0f, 1f);
+        float3 rayDirection = GetRayDirection(45f, DispatchSize.XY, fragCoord);
 
-        Ray ray = Ray.New(eye, direction);
+        float3x3 planetRotation = GetRotation(new float2(0f, this.time * 0.05f));
+        float3x3 atmosphereRotation = GetRotation(new float2(-0.5f, this.time * 0.2f));
 
-        float2 atmosphereIntersects = GetSphereIntersects(ray, this.earth.Atmosphere);
-        float2 planetIntersects = GetSphereIntersects(ray, this.earth.Sphere);
+        Ray planetRay = Ray.New(planetRotation * eye, planetRotation * rayDirection);
+        Ray atmosphereRay = Ray.New(eye * atmosphereRotation, rayDirection * atmosphereRotation);
+
+        float2 atmosphereIntersects = GetSphereIntersects(atmosphereRay, this.earth.Atmosphere);
+        float2 planetIntersects = GetSphereIntersects(planetRay, this.earth.Sphere);
 
         atmosphereIntersects.Y = Min(atmosphereIntersects.Y, planetIntersects.X);
 
-        float3 scatter = InScatter(ray, atmosphereIntersects, lightDirection);
+        float3 planetColor = new(0f, 0f, 0f);
 
-        float4 fragColor = default;
-
-        if (planetIntersects.X < planetIntersects.Y)
+        for (int m = 0; m < SSAA; m++)
         {
-            float3 position = ray.Origin + (ray.Direction * planetIntersects.X);
-            float3 normal = Normalize(this.earth.Sphere.XYZ - position);
+            for (int n = 0; n < SSAA; n++)
+            {
+                float2 aaOffset = new float2(m, n) / SSAA;
 
-            float latitude = 90f - (Acos(normal.Y / Length(normal)) * 180f / Pi);
-            float longitude = Atan2(normal.X, normal.Z) * 180f / Pi;
-            float2 uv = new float2(longitude / 360f, latitude / 180f) + 0.5f;
+                float3 planetRayDirection = GetRayDirection(45f, DispatchSize.XY, fragCoord + aaOffset);
 
-            //float3 dayColor = this.earthDayTexture.Sample(uv).RGB;
-            float3 nightColor = this.earthNightTexture.Sample(uv).RGB;
+                planetRay.Direction = planetRotation * planetRayDirection;
 
-            fragColor.RGB = nightColor;
+                planetIntersects = GetSphereIntersects(planetRay, this.earth.Sphere);
+
+                if (planetIntersects.X <= planetIntersects.Y)
+                {
+                    float3 position = planetRay.Origin + (planetRay.Direction * planetIntersects.X);
+                    float3 normal = Normalize(this.earth.Sphere.XYZ - position);
+
+                    float latitude = 90f - (Acos(normal.Y / Length(normal)) * 180f / Pi);
+                    float longitude = Atan2(normal.X, normal.Z) * 180f / Pi;
+
+                    float2 uv = new float2(longitude / 360f, latitude / 180f) + 0.5f;
+
+                    float3 dayColor = Pow(this.earthDayTexture.Sample(uv).RGB, (float3)(1f / 2f));
+                    float3 nightColor = Pow(this.earthNightTexture.Sample(uv).RGB, 1.5f);
+
+                    float light = Dot(Normalize(atmosphereRay.Origin + (atmosphereRay.Direction * planetIntersects.X)), lightDirection);
+
+                    planetColor += Lerp(nightColor, dayColor * light, SmoothStep(-0.2f, 0.2f, light));
+                }
+            }
         }
 
-        fragColor.RGB += scatter;
+        planetColor /= SSAA * SSAA;
 
-        return fragColor;
+        return new float4(planetColor + GetScattering(atmosphereRay, atmosphereIntersects, lightDirection), 1f);
     }
 }
