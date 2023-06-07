@@ -167,7 +167,7 @@ public class ShadersTests
             shaderType,
             texture => new SwapChain.Shaders.Compute.AtmosphericScattering(0, earth, texture, dayTexture, nightTexture),
             texture => new AtmosphericScattering(0, earth, dayTexture, nightTexture),
-            0.000627f);
+            0.000001f);
     }
 
     /// <summary>
