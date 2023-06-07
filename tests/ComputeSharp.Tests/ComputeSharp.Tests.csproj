@@ -41,6 +41,8 @@
   <ItemGroup>
     <None Include="..\..\samples\ComputeSharp.ImageProcessing\city.jpg" Link="Imaging\city.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\ComputeSharp.SwapChain\Textures\RustyMetal.png" Link="Shaders\Textures\RustyMetal.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\ComputeSharp.SwapChain\Textures\DayEarth.jpg" Link="Shaders\Textures\DayEarth.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\ComputeSharp.SwapChain\Textures\NightEarth.jpg" Link="Shaders\Textures\NightEarth.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Assets\CityAfter1024x1024Sampling.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -99,6 +101,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Assets\TriangleGridContouring.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Assets\AtmosphericScattering.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

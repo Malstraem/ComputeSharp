@@ -148,6 +148,28 @@ public class ShadersTests
         RunAndCompareShader(device, shaderType, 0.000026f);
     }
 
+    [CombinatorialTestMethod]
+    [AllDevices]
+    [Data(typeof(AtmosphericScattering))]
+    [Data(typeof(SwapChain.Shaders.Compute.AtmosphericScattering))]
+    public void AtmosphericScattering(Device device, Type shaderType)
+    {
+        string dayFilename = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "Shaders", "Textures", "DayEarth.jpg");
+        string nightFilename = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "Shaders", "Textures", "NightEarth.jpg");
+
+        using ReadOnlyTexture2D<Rgba32, float4> dayTexture = device.Get().LoadReadOnlyTexture2D<Rgba32, float4>(dayFilename);
+        using ReadOnlyTexture2D<Rgba32, float4> nightTexture = device.Get().LoadReadOnlyTexture2D<Rgba32, float4>(nightFilename);
+
+        Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.25f);
+
+        RunAndCompareShader(
+            device,
+            shaderType,
+            texture => new SwapChain.Shaders.Compute.AtmosphericScattering(0, earth, texture, dayTexture, nightTexture),
+            texture => new AtmosphericScattering(0, earth, dayTexture, nightTexture),
+            0.000627f);
+    }
+
     /// <summary>
     /// Executes a given test for a specified shader.
     /// </summary>

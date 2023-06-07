@@ -24,7 +24,7 @@ public sealed class D2D1AtmosphericScatteringEffect : PixelShaderEffect
     /// </summary>
     private static readonly EffectNode<PixelShaderEffect<AtmosphericScattering>> PixelShaderEffect = new();
 
-    private Earth earth = Earth.New(new float4((float3)0, 1), 0.2f);
+    private Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.25f);
 
     private static unsafe D2D1ResourceTextureManager CreateTextureManager(string filename)
     {
@@ -49,9 +49,11 @@ public sealed class D2D1AtmosphericScatteringEffect : PixelShaderEffect
     /// <inheritdoc/>
     protected override unsafe void BuildEffectGraph(EffectGraph effectGraph)
     {
-        D2D1ResourceTextureManager dayTextureManager = CreateTextureManager(Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Textures", "DayEarth.jpg"));
+        string dayFilename = Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Textures", "DayEarth.jpg");
+        string nightFilename = Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Textures", "NightEarth.jpg");
 
-        D2D1ResourceTextureManager nightTextureManager = CreateTextureManager(Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Textures", "NightEarth.jpg"));
+        D2D1ResourceTextureManager dayTextureManager = CreateTextureManager(dayFilename);
+        D2D1ResourceTextureManager nightTextureManager = CreateTextureManager(nightFilename);
 
         PixelShaderEffect<AtmosphericScattering> pixelShaderEffect = new()
         {
@@ -68,8 +70,7 @@ public sealed class D2D1AtmosphericScatteringEffect : PixelShaderEffect
     /// <inheritdoc/>
     protected override void ConfigureEffectGraph(EffectGraph effectGraph)
     {
-        effectGraph.GetNode(PixelShaderEffect).ConstantBuffer = new AtmosphericScattering((float)ElapsedTime.TotalSeconds,
-                                                                                           new int2(ScreenWidth, ScreenHeight),
-                                                                                           this.earth);
+        int2 dispatchSize = new(ScreenWidth, ScreenHeight);
+        effectGraph.GetNode(PixelShaderEffect).ConstantBuffer = new AtmosphericScattering((float)ElapsedTime.TotalSeconds, dispatchSize, this.earth);
     }
 }
