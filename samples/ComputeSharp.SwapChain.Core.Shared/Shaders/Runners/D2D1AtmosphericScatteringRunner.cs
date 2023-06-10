@@ -24,7 +24,7 @@ public sealed class D2D1AtmosphericScatteringEffect : PixelShaderEffect
     /// </summary>
     private static readonly EffectNode<PixelShaderEffect<AtmosphericScattering>> PixelShaderEffect = new();
 
-    private Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.25f);
+    private Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.15f);
 
     private static unsafe D2D1ResourceTextureManager CreateTextureManager(string filename)
     {

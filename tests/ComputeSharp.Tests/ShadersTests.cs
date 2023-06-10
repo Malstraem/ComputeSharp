@@ -160,13 +160,13 @@ public class ShadersTests
         using ReadOnlyTexture2D<Rgba32, float4> dayTexture = device.Get().LoadReadOnlyTexture2D<Rgba32, float4>(dayFilename);
         using ReadOnlyTexture2D<Rgba32, float4> nightTexture = device.Get().LoadReadOnlyTexture2D<Rgba32, float4>(nightFilename);
 
-        Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.25f);
+        Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.15f);
 
         RunAndCompareShader(
             device,
             shaderType,
-            texture => new SwapChain.Shaders.Compute.AtmosphericScattering(0, earth, texture, dayTexture, nightTexture),
-            texture => new AtmosphericScattering(0, earth, dayTexture, nightTexture),
+            texture => new SwapChain.Shaders.Compute.AtmosphericScattering(10, earth, texture, dayTexture, nightTexture),
+            texture => new AtmosphericScattering(10, earth, dayTexture, nightTexture),
             0.000001f);
     }
 

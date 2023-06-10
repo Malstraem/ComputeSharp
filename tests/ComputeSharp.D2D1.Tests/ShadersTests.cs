@@ -118,29 +118,29 @@ public class ShadersTests
     {
         static D2D1ResourceTextureManager CreateTextureManager(string filename)
         {
-            using Image<Rgba32> texture = Image.Load<Rgba32>(filename);
+            using Image<Rgba32> image = Image.Load<Rgba32>(filename);
 
-            if (!texture.DangerousTryGetSinglePixelMemory(out Memory<Rgba32> pixels))
+            if (!image.DangerousTryGetSinglePixelMemory(out Memory<Rgba32> pixels))
             {
                 Assert.Inconclusive();
             }
 
             return new D2D1ResourceTextureManager(
-                extents: stackalloc uint[] { (uint)texture.Width, (uint)texture.Height },
+                extents: stackalloc uint[] { (uint)image.Width, (uint)image.Height },
                 bufferPrecision: D2D1BufferPrecision.UInt8Normalized,
                 channelDepth: D2D1ChannelDepth.Four,
                 filter: D2D1Filter.MinMagMipLinear,
                 extendModes: stackalloc D2D1ExtendMode[] { D2D1ExtendMode.Mirror, D2D1ExtendMode.Mirror },
                 data: MemoryMarshal.AsBytes(pixels.Span),
-                strides: stackalloc uint[] { (uint)(texture.Width * sizeof(Rgba32)) });
+                strides: stackalloc uint[] { (uint)(image.Width * sizeof(Rgba32)) });
         }
 
         string assemblyPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
         string dayfilename = Path.Combine(assemblyPath, "Assets", "Textures", "DayEarth.jpg");
         string nightfilename = Path.Combine(assemblyPath, "Assets", "Textures", "NightEarth.jpg");
 
-        Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.25f);
-        AtmosphericScattering shader = new(0f, new int2(1280, 720), earth);
+        Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.15f);
+        AtmosphericScattering shader = new(10f, new int2(1280, 720), earth);
 
         (int index, D2D1ResourceTextureManager manager)[] managers = { (0, CreateTextureManager(dayfilename)), (1, CreateTextureManager(nightfilename)) };
 

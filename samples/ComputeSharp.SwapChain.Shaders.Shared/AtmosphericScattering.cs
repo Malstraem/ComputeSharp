@@ -206,7 +206,8 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
 
         atmosphereIntersects.Y = Min(atmosphereIntersects.Y, planetIntersects.X);
 
-        float3 planetColor = new(0f, 0f, 0f);
+        float3 planet = default;
+        float3 scattering = GetScattering(atmosphereRay, atmosphereIntersects, lightDirection);
 
         for (int m = 0; m < SSAA; m++)
         {
@@ -230,18 +231,18 @@ internal readonly partial struct AtmosphericScattering : IPixelShader<float4>
 
                     float2 uv = new float2(longitude / 360f, latitude / 180f) + 0.5f;
 
-                    float3 dayColor = Pow(this.earthDayTexture.Sample(uv).RGB, (float3)(1f / 2f));
-                    float3 nightColor = Pow(this.earthNightTexture.Sample(uv).RGB, 1.5f);
-
                     float light = Dot(Normalize(atmosphereRay.Origin + (atmosphereRay.Direction * planetIntersects.X)), lightDirection);
 
-                    planetColor += Lerp(nightColor, dayColor * light, SmoothStep(-0.2f, 0.2f, light));
+                    float3 dayColor = Lerp(this.earthDayTexture.Sample(uv).RGB, scattering, 0.5f) * light;
+                    float3 nightColor = Pow(this.earthNightTexture.Sample(uv).RGB, 1.8f);
+
+                    planet += Lerp(nightColor, dayColor, SmoothStep(-this.earth.AtmosphereThickness, this.earth.AtmosphereThickness, light));
                 }
             }
         }
 
-        planetColor /= SSAA * SSAA;
+        planet /= SSAA * SSAA;
 
-        return new float4(planetColor + GetScattering(atmosphereRay, atmosphereIntersects, lightDirection), 1f);
+        return new float4(planet + scattering, 1f);
     }
 }

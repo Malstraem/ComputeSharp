@@ -21,7 +21,7 @@ public sealed class AtmosphericScatteringRunner : IShaderRunner
 
     private ReadOnlyTexture2D<Rgba32, Float4>? earthNightTexture;
 
-    private Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.25f);
+    private Earth earth = Earth.New(sphere: new float4((float3)0, 1), atmosphereThickness: 0.15f);
 
     /// <inheritdoc/>
     public bool TryExecute(IReadWriteNormalizedTexture2D<Float4> texture, TimeSpan timespan, object? parameter)
